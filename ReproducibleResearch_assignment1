@@ -1,0 +1,105 @@
+install.packages("dplyr")
+library(dplyr)
+install.packages('ggplot2')
+library(ggplot2)
+install.packages('scales')
+> library(scales)
+> act = read.csv("activity.csv" ,header = TRUE, colClasses = c("numeric", "Date", "numeric"))
+> str(act)
+'data.frame':    17568 obs. of  3 variables:
+    $ steps   : num  NA NA NA NA NA NA NA NA NA NA ...
+$ date    : Date, format: "2012-10-01" "2012-10-01" "2012-10-01" "2012-10-01" ...
+$ interval: num  0 5 10 15 20 25 30 35 40 45 ...
+> ## create a new data frame with the number of steps per day using dplyr
+    
+actDay <- act %.% group_by(date) %.% summarise(Steps = sum(steps))
+p <- ggplot(data = actDay, mapping = aes(x = Steps)) + geom_histogram(fill = "blue", 
+                                                                      colour = "black") + scale_x_continuous("Steps per Day", labels = comma) + 
+    scale_y_continuous("Frequency") + ggtitle("Total Number of Steps Taken Each Day")
+> p
+## Calculate and report the mean and median total number of steps taken per day
+
+
+> meanStepsDay <- mean(actDay$Steps, na.rm = TRUE)
+formatC(meanStepsDay, big.mark = ",", format = "f", digits = 0)
+> medianStepsDay <- median(actDay$Steps, na.rm = TRUE)
+formatC(medianStepsDay, big.mark = ",", format = "f", digits = 0)
+
+## create a new data frame with the average number of steps per interval
+## using dplyr I am omitting nas here.
+
+actInterval <- act %.% group_by(interval) %.% summarise(meanSteps = mean(steps, 
+                                                                            na.rm = TRUE))
+
+p2 <- ggplot(data = actInterval, mapping = aes(x = interval, y = meanSteps)) + 
+    geom_line() + scale_x_continuous("Day Interval", breaks = seq(min(actInterval$interval), 
+                                                                  max(actInterval$interval), 100)) + scale_y_continuous("Average Number of Steps") + 
+    ggtitle("Average Number of Steps Taken by Interval")
+p2
+
+sum(is.na(act$steps))
+# for the filling I am going to use the mean instead of the missing value
+# First I will merge the original data with the average by interval data
+
+actdat2 <- act %.% left_join(actInterval, by = "interval")
+# now, I'm going to create a new column replacing the missing data with the
+# average
+
+actdat2$fillSteps <- ifelse(is.na(actdat2$steps), actdat2$meanSteps, actdat2$steps)
+
+# Now, I will drop the steps column as well as the meanSteps column, and
+# then rename the fillSteps column as steps
+
+actdat2$steps <- NULL
+actdat2$meanSteps <- NULL
+colnames(actdat2) <- c("date", "interval", "steps")
+
+actdat2 <- actdat2[, c(3, 1, 2)]
+head(actdat2)
+
+##     steps       date interval
+## 1 1.71698 2012-10-01        0
+## 2 0.33962 2012-10-01        5
+## 3 0.13208 2012-10-01       10
+## 4 0.15094 2012-10-01       15
+## 5 0.07547 2012-10-01       20
+## 6 2.09434 2012-10-01       25
+
+## create a new data frame with the number of steps per day using dplyr
+
+act2 <- actdat2 %.% group_by(date) %.% summarise(Steps = sum(steps))
+
+p3 <- ggplot(data = act2, mapping = aes(x = Steps)) + geom_histogram(fill = "red", 
+                                                                        colour = "black") + scale_x_continuous("Steps per Day", labels = comma) + 
+    scale_y_continuous("Frequency") + ggtitle("Total Number of Steps Taken Each Day - Missing Values Adjusted")
+p3
+
+
+meanStepsDay2 <- mean(act2$Steps, na.rm = TRUE)
+formatC(meanStepsDay2, big.mark = ",", format = "f", digits = 0)
+
+## [1] "10,766"
+medianStepsDay2 <- median(act2$Steps, na.rm = TRUE)
+formatC(medianStepsDay2, big.mark = ",", format = "f", digits = 0)
+act2$weekdayType <- ifelse(weekdays(act2$date) %in% c("Satuday", "Sunday"), 
+                              "weekend", "weekday")
+
+head(act2)
+
+## create a new data frame with the average number of steps per interval
+## using dplyr
+
+
+## create a new data frame with the average number of steps per interval
+## using dplyr
+
+
+actInterval2 <- actdat2 %.% group_by(interval, weekdayType) %.% summarise(meanSteps = mean(steps, 
+                                                                                           na.rm = TRUE))
+
+p4 <- ggplot(data = actInterval2, mapping = aes(x = interval, y = meanSteps)) + 
+    geom_line() + facet_grid(weekdayType ~ .) + scale_x_continuous("Day Interval", 
+                                                                   breaks = seq(min(actInterval2$interval), max(actInterval2$interval), 100)) + 
+    scale_y_continuous("Average Number of Steps") + ggtitle("Average Number of Steps Taken by Interval")
+p4
+
