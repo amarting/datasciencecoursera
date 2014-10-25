@@ -1,0 +1,117 @@
+Peer Assessment 2 for Coursera Course on Reproducible Research
+
+Synopsis
+
+This report explores the U.S. National Oceanic and Atmospheric Administration's (NOAA) Storm database which records characteristics of major weather events and estimates of fatalities, injuries and property damage. We identify the top event-types in terms of aggregate and per event average impact on population health and property damage. For the purpose of this analysis, we combine fatalities and injuries into a single Human Economic Cost estimation.
+
+The exploration shows the top aggregate impact to population health and property to be Tornados. The top per-event average impacts give a different ranking, but the numbers may be too small to give a good picture.
+
+The Event Type field shows a lot of variation in coding, and is non-hierarchical. Further work should be done to create an event type hierarchy suitable to disaster preparedness planning and to map the Storm dataset into that hierarchy with appropriate cleaning of the Event Type field.
+
+Data Processing
+
+The data is read from a CSV file, and summary lines are removed. The rudimentary step of normalizing the Event Type names to upper case is also performed. The resulting dataset shows events from January 1950 to November 2011.
+
+```{r}
+data <- read.csv("../data/repdata-data-StormData.csv")
+data$EVTYPE = toupper(data$EVTYPE)
+data2 <- data[!grepl("Summary", data$EVTYPE), ]
+
+summary(as.Date(data2$BGN_DATE, format = "%m/%d/%Y"))
+##         Min.      1st Qu.       Median         Mean      3rd Qu. 
+## "1950-01-03" "1995-04-20" "2002-03-18" "1998-12-27" "2007-07-28" 
+##         Max. 
+## "2011-11-30"
+
+```
+
+As an aid to disaster peparedness planning, for each event type we will consider both the total cost and the per-event average cost.
+```{r}
+library(plyr)
+byEvent = ddply(data2, .(EVTYPE), summarize, meanHF = mean(FATALITIES), totalHF = sum(FATALITIES), 
+    meanHI = mean(INJURIES), totalHI = sum(INJURIES), meanPD = mean(PROPDMG), 
+    totalPD = sum(PROPDMG))
+byEvent$EVTYPE.ID = as.numeric(byEvent$EVTYPE)
+```
+
+
+
+Results
+
+Impact of Events on Population Health
+
+We now turn to the question of the identifying the impacts to health of the different disasters types. The data contains two relevant points, Fatalities and Injuries. In order to determine the disaster types with the largest impacts, we would like to combine these into a single measure of impact.
+
+The National Safety Council in Estimating Cost of Unintentional Injuries gives the estimated economic cost of a fatality as $1,410,000 and that of injury as $78,900. We will use the resulting ratio of 17.87 to combine the Fatalities and Injuries data into a single measure of estimated impact, Human Economic Cost.
+```{r}
+scaleFI <- 1410000/78900
+byEvent$totalHumanEconomicCost <- scaleFI * byEvent$totalHF + byEvent$totalHI
+byEvent$meanHumanEconomicCost <- scaleFI * byEvent$meanHF + byEvent$meanHI
+```
+
+
+The following plots show the Total and Per-Event impact on Fatalities, Injuries, and the corresponding estimate of Human Economic Cost by type of event, in decreasing order of Human Economic Cost.
+```{r}
+par(mfrow = c(2, 1), mai = c(2.4, 1, 1.4, 0.1))
+n <- 25
+plotdata <- byEvent[order(byEvent$totalHumanEconomicCost, decreasing = T), ][1:n, 
+    ]
+
+
+plot(log10(1 + plotdata$totalHumanEconomicCost), col = "black", type = "b", 
+    xaxt = "n", xlab = "", main = "Top 20 Total Economic Cost of Human Fatalities and Injuries by Event Type", 
+    ylab = "log10(1 + Total Economic Cost (USD))")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+
+plot(log10(1 + plotdata$totalHF), col = "red", type = "p", xaxt = "n", xlab = "", 
+    main = "Total Fatalities and Injuries for Top 20 Event Types", ylab = "log10(1 + count)")
+points(log10(1 + plotdata$totalHI), col = "blue", type = "p", xaxt = "n", xlab = "")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+legend("topright", c("Fatalities", "Injuries"), col = c("red", "blue"), pch = 1)
+plot of chunk unnamed-chunk-4
+
+
+
+par(mfrow = c(2, 1), mai = c(2.6, 1, 1.4, 0.1))
+plotdata <- byEvent[order(byEvent$meanHumanEconomicCost, decreasing = T), ][1:n, 
+    ]
+
+plot(log10(1 + plotdata$meanHumanEconomicCost), col = "black", type = "b", xaxt = "n", 
+    xlab = "", main = "Top 20 Average per-event Economic Cost of Human Fatalities and Injuries by Event Type", 
+    ylab = "log10( 1 + Average per-event Economic Cost (USD) per event)")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+
+plot(log10(1 + plotdata$meanHF), col = "red", type = "p", xaxt = "n", xlab = "", 
+    main = "Average Per-Event Fatalities and Injuries for Top 20 Event Types", 
+    ylab = "log10(1 + average)")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+
+points(log10(1 + plotdata$meanHI), col = "blue", type = "p", xaxt = "n", xlab = "")
+legend("topright", c("Fatalities", "Injuries"), col = c("red", "blue"), pch = 1)
+plot of chunk unnamed-chunk-4
+```
+
+From the above we can see that Tornados have the highest aggregate cost, while Unseasonably Warm and Dry has the largest per-event impact.
+
+Impact of Events on Property
+
+The following plots show the Total and Average Property Damage for each Event Type.
+```{r}
+par(mfrow = c(2, 1), mai = c(1.8, 1, 1.2, 0.1))
+n <- 25
+plotdata <- byEvent[order(byEvent$totalPD, decreasing = T), ][1:n, ]
+
+plot(log10(1 + plotdata$totalPD), col = "black", type = "b", xaxt = "n", xlab = "", 
+    main = "Top 20 Total Property Damage by Event Type", ylab = "log10(1 + Total Property Damage (USD))")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+
+n <- 5
+plotdata <- byEvent[order(byEvent$meanPD, decreasing = T), ][1:n, ]
+plot(log10(1 + plotdata$meanPD), col = "black", type = "b", xaxt = "n", xlab = "", 
+    main = paste("Top ", n, " Per-Event Average Property Damage by Event Type"), 
+    ylab = "log10(1 + Average Property Damage (USD))")
+axis(1, labels = plotdata$EVTYPE, at = 1:length(plotdata$EVTYPE), las = 2, cex.axis = 0.8)
+plot of chunk unnamed-chunk-5
+```
+
+From the above we can see that the largest aggregate property damage is again due to Tornados. Costal Erosion has the highest average per-event property da
